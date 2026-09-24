@@ -1,6 +1,11 @@
 const { draftPost } = require("../lib/gemini");
 const { sendMessage } = require("../lib/telegram");
-const { scorePost, isScoreTrigger, isPureScoreRequest } = require("../lib/scoring");
+const {
+  scorePost,
+  isScoreTrigger,
+  isReplyScoreTrigger,
+  isPureScoreRequest,
+} = require("../lib/scoring");
 
 module.exports = async function handler(req, res) {
   if (req.method !== "POST") {
@@ -26,7 +31,7 @@ module.exports = async function handler(req, res) {
     try {
       let reply;
 
-      if (repliedText && isScoreTrigger(note)) {
+      if (repliedText && isReplyScoreTrigger(note)) {
         // Scoring an existing post: Meera replied to the draft she means.
         const scoreBlock = await scorePost(repliedText);
         reply = `${repliedText}\n\n${scoreBlock}`;
