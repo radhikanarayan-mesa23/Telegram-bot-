@@ -22,8 +22,13 @@ module.exports = async function handler(req, res) {
     const note = message.text;
 
     try {
-      const draft = await draftPost(note);
-      await sendMessage(chatId, draft);
+      const { draft, sources } = await draftPost(note);
+      const reply = sources.length
+        ? `${draft}\n\n—\nChecked against:\n${sources
+            .map((s) => `${s.title || "source"}: ${s.uri}`)
+            .join("\n")}`
+        : draft;
+      await sendMessage(chatId, reply);
     } catch (err) {
       console.error("Failed to generate/send draft:", err);
       try {
