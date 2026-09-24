@@ -1,5 +1,6 @@
 const { draftPost } = require("../lib/gemini");
 const { sendMessage } = require("../lib/telegram");
+const { scorePost, isScoreTrigger, isPureScoreRequest } = require("../lib/scoring");
 
 module.exports = async function handler(req, res) {
   if (req.method !== "POST") {
@@ -20,14 +21,35 @@ module.exports = async function handler(req, res) {
 
     const chatId = message.chat.id;
     const note = message.text;
+    const repliedText = message.reply_to_message && message.reply_to_message.text;
 
     try {
-      const { draft, sources } = await draftPost(note);
-      const reply = sources.length
-        ? `${draft}\n\n—\nChecked against:\n${sources
-            .map((s) => `${s.title || "source"}: ${s.uri}`)
-            .join("\n")}`
-        : draft;
+      let reply;
+
+      if (repliedText && isScoreTrigger(note)) {
+        // Scoring an existing post: Meera replied to the draft she means.
+        const scoreBlock = await scorePost(repliedText);
+        reply = `${repliedText}\n\n${scoreBlock}`;
+      } else if (!repliedText && isPureScoreRequest(note)) {
+        // "score this" with nothing to attach it to.
+        reply =
+          'Reply directly to the post you want scored, then send "score this" again.';
+      } else {
+        const { draft, sources } = await draftPost(note);
+        const parts = [draft];
+        if (sources.length) {
+          parts.push(
+            `—\nChecked against:\n${sources
+              .map((s) => `${s.title || "source"}: ${s.uri}`)
+              .join("\n")}`
+          );
+        }
+        if (isScoreTrigger(note)) {
+          parts.push(await scorePost(draft));
+        }
+        reply = parts.join("\n\n");
+      }
+
       await sendMessage(chatId, reply);
     } catch (err) {
       console.error("Failed to generate/send draft:", err);
